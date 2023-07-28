@@ -32,6 +32,8 @@ class MoveGenerator():
         self.UNSIGNED_LONG_1 = np.ulonglong(1)
         self.not_h_file = np.ulonglong(9187201950435737471)
         self.not_a_file = np.ulonglong(18374403900871474942)
+        self.not_hg_file = np.ulonglong(4557430888798830399)
+        self.not_ab_file = np.ulonglong(4557430888798830399)
 
     def generate_moves(self, bitboard, move_color) -> list:
 
@@ -44,8 +46,8 @@ class MoveGenerator():
             pawn_moves = self.generate_white_pawn_moves(bitboard)
         moves.extend(pawn_moves)
 
-        # bishop_moves = self.generate_bishop_moves(bitboard, move_color)
-        # moves.extend(bishop_moves)
+        bishop_moves = self.generate_bishop_moves(bitboard, move_color)
+        moves.extend(bishop_moves)
 
         # knight_moves = self.generate_knight_moves(bitboard, move_color)
         # moves.extend(knight_moves)
@@ -97,11 +99,10 @@ class MoveGenerator():
         return moves
 
     def generate_black_pawn_moves(self, bitboard: Bitboard) -> list:
+
         moves = []
         black_pawns = bitboard.black_pawns
 
-        attack_squares = np.uint64(0)
-        board = np.uint64(0)
         for square in range(64):
             if self.is_piece_on_square(black_pawns, square):
                 # Check if pawn can move up one
@@ -134,7 +135,87 @@ class MoveGenerator():
         return moves
 
     def generate_bishop_moves(self, bitboard: Bitboard, color_to_move):
+        moves = []
         bishops = bitboard.black_bishops if color_to_move else bitboard.white_bishops
+        opponent_pieces = bitboard.white_board if color_to_move else bitboard.black_board
+
+        bishop_diagonal_ne_sw = 7
+        bishop_diagonal_nw_se = 9
+
+        for square in range(64):
+            if self.is_piece_on_square(bishops, square):
+                # Check southeast diagonal until we hit the edge of the board or a friendly piece
+                new_square = square
+                while True:
+                    board = np.uint64(0)
+                    board = self.set_bit(board, new_square)
+                    if ((board << np.uint64(bishop_diagonal_nw_se)) & self.not_a_file):
+                        target_square = self.get_least_sig_bit_index(board << np.uint64(bishop_diagonal_nw_se))
+                        if self.is_piece_on_square(opponent_pieces, target_square):
+                            new_square = new_square + bishop_diagonal_nw_se
+                            moves.append("Bx" + SQUARES_TO_COORDS[target_square])
+                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
+                            new_square = new_square + bishop_diagonal_nw_se
+                            moves.append("B" + SQUARES_TO_COORDS[new_square])
+                        else:
+                            break
+                    else:
+                        break
+
+                # Check northwest diagonal until we hit the edge of the board or a friendly piece
+                new_square = square
+                while True:
+                    board = np.uint64(0)
+                    board = self.set_bit(board, new_square)
+                    if ((board >> np.uint64(bishop_diagonal_nw_se)) & self.not_h_file):
+                        target_square = self.get_least_sig_bit_index(board >> np.uint64(bishop_diagonal_nw_se))
+                        if self.is_piece_on_square(opponent_pieces, target_square):
+                            new_square = new_square - bishop_diagonal_nw_se
+                            moves.append("Bx" + SQUARES_TO_COORDS[target_square])
+                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
+                            new_square = new_square - bishop_diagonal_nw_se
+                            moves.append("B" + SQUARES_TO_COORDS[new_square])
+                        else:
+                            break
+                    else:
+                        break
+
+                # Check southwest diagonal until we hit the edge of the board or a friendly piece
+                new_square = square
+                while True:
+                    board = np.uint64(0)
+                    board = self.set_bit(board, new_square)
+                    if ((board << np.uint64(bishop_diagonal_ne_sw)) & self.not_h_file):
+                        target_square = self.get_least_sig_bit_index(board << np.uint64(bishop_diagonal_ne_sw))
+                        if self.is_piece_on_square(opponent_pieces, target_square):
+                            new_square = new_square + bishop_diagonal_ne_sw
+                            moves.append("Bx" + SQUARES_TO_COORDS[target_square])
+                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
+                            new_square = new_square + bishop_diagonal_ne_sw
+                            moves.append("B" + SQUARES_TO_COORDS[new_square])
+                        else:
+                            break
+                    else:
+                        break
+
+                # Check northeast diagonal until we hit the edge of the board or a friendly piece
+                new_square = square
+                while True:
+                    board = np.uint64(0)
+                    board = self.set_bit(board, new_square)
+                    if ((board >> np.uint64(bishop_diagonal_ne_sw)) & self.not_a_file):
+                        target_square = self.get_least_sig_bit_index(board >> np.uint64(bishop_diagonal_ne_sw))
+                        if self.is_piece_on_square(opponent_pieces, target_square):
+                            new_square = new_square + bishop_diagonal_ne_sw
+                            moves.append("Bx" - SQUARES_TO_COORDS[target_square])
+                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
+                            new_square = new_square - bishop_diagonal_ne_sw
+                            moves.append("B" + SQUARES_TO_COORDS[new_square])
+                        else:
+                            break
+                    else:
+                        break
+        return moves
 
     def generate_knight_moves(self, bitboard: Bitboard, color_to_move):
         knights = bitboard.black_knights if color_to_move else bitboard.white_knights
@@ -151,7 +232,7 @@ class MoveGenerator():
     def is_piece_on_square(self, bitboard: np.uint64, square: int) -> bool:
         return bool(np.ulonglong(bitboard) & (self.UNSIGNED_LONG_1 << np.ulonglong(square)))
 
-    def set_bit(self, bitboard: np.uint64, square: int):
+    def set_bit(self, bitboard: np.uint64, square: int) -> np.uint64:
         return np.ulonglong(bitboard) | (self.UNSIGNED_LONG_1 << np.ulonglong(square))
 
     def get_least_sig_bit_index(self, board):
