@@ -33,7 +33,7 @@ class MoveGenerator():
         self.not_h_file = np.ulonglong(9187201950435737471)
         self.not_a_file = np.ulonglong(18374403900871474942)
         self.not_hg_file = np.ulonglong(4557430888798830399)
-        self.not_ab_file = np.ulonglong(4557430888798830399)
+        self.not_ab_file = np.ulonglong(18229723555195321596)
 
     def generate_moves(self, bitboard, move_color) -> list:
 
@@ -46,23 +46,24 @@ class MoveGenerator():
             pawn_moves = self.generate_white_pawn_moves(bitboard)
         moves.extend(pawn_moves)
 
-        bishop_moves = self.generate_bishop_moves(bitboard, move_color)
+        bishop_moves = self.generate_bishop_moves(bitboard, move_color, is_queen=False)
         moves.extend(bishop_moves)
 
-        # knight_moves = self.generate_knight_moves(bitboard, move_color)
-        # moves.extend(knight_moves)
+        knight_moves = self.generate_knight_moves(bitboard, move_color)
+        moves.extend(knight_moves)
 
-        # rook_moves = self.generate_rook_moves(bitboard, move_color)
-        # moves.extend(rook_moves)
+        rook_moves = self.generate_rook_moves(bitboard, move_color, is_queen=False)
+        moves.extend(rook_moves)
 
-        # queen_moves = self.generate_queen_moves(bitboard, move_color)
-        # moves.extend(queen_moves)
+        queen_moves = self.generate_queen_moves(bitboard, move_color)
+        moves.extend(queen_moves)
 
-        # king_moves = self.generate_king_moves(bitboard, move_color)
-        # moves.extend(king_moves)
+        king_moves = self.generate_king_moves(bitboard, move_color)
+        moves.extend(king_moves)
 
         return moves
 
+    # TODO: parameterize this somehow
     def generate_white_pawn_moves(self, bitboard: Bitboard) -> list:
 
         moves = []
@@ -98,6 +99,7 @@ class MoveGenerator():
                         moves.append(SQUARES_TO_COORDS[square][:-1] + "x" + SQUARES_TO_COORDS[target_square])
         return moves
 
+    # TODO: parameterize this somehow
     def generate_black_pawn_moves(self, bitboard: Bitboard) -> list:
 
         moves = []
@@ -134,9 +136,17 @@ class MoveGenerator():
 
         return moves
 
-    def generate_bishop_moves(self, bitboard: Bitboard, color_to_move):
+    def generate_bishop_moves(self, bitboard: Bitboard, color_to_move: bool, is_queen: bool) -> list:
         moves = []
-        bishops = bitboard.black_bishops if color_to_move else bitboard.white_bishops
+        piece_letter = ""
+        # Queen can use the same exact algorithm
+        if is_queen:
+            bishops = bitboard.black_queens if color_to_move else bitboard.white_queens
+            piece_letter = "Q"
+        else:
+            bishops = bitboard.black_bishops if color_to_move else bitboard.white_bishops
+            piece_letter = "B"
+
         opponent_pieces = bitboard.white_board if color_to_move else bitboard.black_board
 
         bishop_diagonal_ne_sw = 7
@@ -144,90 +154,311 @@ class MoveGenerator():
 
         for square in range(64):
             if self.is_piece_on_square(bishops, square):
+
                 # Check southeast diagonal until we hit the edge of the board or a friendly piece
-                new_square = square
-                while True:
-                    board = np.uint64(0)
-                    board = self.set_bit(board, new_square)
-                    if ((board << np.uint64(bishop_diagonal_nw_se)) & self.not_a_file):
-                        target_square = self.get_least_sig_bit_index(board << np.uint64(bishop_diagonal_nw_se))
-                        if self.is_piece_on_square(opponent_pieces, target_square):
-                            new_square = new_square + bishop_diagonal_nw_se
-                            moves.append("Bx" + SQUARES_TO_COORDS[target_square])
-                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
-                            new_square = new_square + bishop_diagonal_nw_se
-                            moves.append("B" + SQUARES_TO_COORDS[new_square])
-                        else:
-                            break
-                    else:
-                        break
+                moves.extend(self.calculate_bishop_bitboard_moves(
+                    square=square,
+                    diagonal=bishop_diagonal_nw_se,
+                    file=self.not_a_file,
+                    left_shift=True,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter=piece_letter,
+                    subtract=False
+                ))
 
                 # Check northwest diagonal until we hit the edge of the board or a friendly piece
-                new_square = square
-                while True:
-                    board = np.uint64(0)
-                    board = self.set_bit(board, new_square)
-                    if ((board >> np.uint64(bishop_diagonal_nw_se)) & self.not_h_file):
-                        target_square = self.get_least_sig_bit_index(board >> np.uint64(bishop_diagonal_nw_se))
-                        if self.is_piece_on_square(opponent_pieces, target_square):
-                            new_square = new_square - bishop_diagonal_nw_se
-                            moves.append("Bx" + SQUARES_TO_COORDS[target_square])
-                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
-                            new_square = new_square - bishop_diagonal_nw_se
-                            moves.append("B" + SQUARES_TO_COORDS[new_square])
-                        else:
-                            break
-                    else:
-                        break
+                moves.extend(self.calculate_bishop_bitboard_moves(
+                    square=square,
+                    diagonal=bishop_diagonal_nw_se,
+                    file=self.not_h_file,
+                    left_shift=False,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter=piece_letter,
+                    subtract=True
+                ))
 
                 # Check southwest diagonal until we hit the edge of the board or a friendly piece
-                new_square = square
-                while True:
-                    board = np.uint64(0)
-                    board = self.set_bit(board, new_square)
-                    if ((board << np.uint64(bishop_diagonal_ne_sw)) & self.not_h_file):
-                        target_square = self.get_least_sig_bit_index(board << np.uint64(bishop_diagonal_ne_sw))
-                        if self.is_piece_on_square(opponent_pieces, target_square):
-                            new_square = new_square + bishop_diagonal_ne_sw
-                            moves.append("Bx" + SQUARES_TO_COORDS[target_square])
-                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
-                            new_square = new_square + bishop_diagonal_ne_sw
-                            moves.append("B" + SQUARES_TO_COORDS[new_square])
-                        else:
-                            break
-                    else:
-                        break
+                moves.extend(self.calculate_bishop_bitboard_moves(
+                    square=square,
+                    diagonal=bishop_diagonal_ne_sw,
+                    file=self.not_h_file,
+                    left_shift=True,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter=piece_letter,
+                    subtract=False
+                ))
 
                 # Check northeast diagonal until we hit the edge of the board or a friendly piece
-                new_square = square
-                while True:
-                    board = np.uint64(0)
-                    board = self.set_bit(board, new_square)
-                    if ((board >> np.uint64(bishop_diagonal_ne_sw)) & self.not_a_file):
-                        target_square = self.get_least_sig_bit_index(board >> np.uint64(bishop_diagonal_ne_sw))
-                        if self.is_piece_on_square(opponent_pieces, target_square):
-                            new_square = new_square + bishop_diagonal_ne_sw
-                            moves.append("Bx" - SQUARES_TO_COORDS[target_square])
-                        elif not self.is_piece_on_square(bitboard.full_board, target_square):
-                            new_square = new_square - bishop_diagonal_ne_sw
-                            moves.append("B" + SQUARES_TO_COORDS[new_square])
-                        else:
-                            break
-                    else:
-                        break
+                moves.extend(self.calculate_bishop_bitboard_moves(
+                    square=square,
+                    diagonal=bishop_diagonal_ne_sw,
+                    file=self.not_a_file,
+                    left_shift=False,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter=piece_letter,
+                    subtract=True
+                ))
+
         return moves
 
-    def generate_knight_moves(self, bitboard: Bitboard, color_to_move):
+    def generate_knight_moves(self, bitboard: Bitboard, color_to_move: int) -> list:
+        moves = []
         knights = bitboard.black_knights if color_to_move else bitboard.white_knights
+        opponent_pieces = bitboard.white_board if color_to_move else bitboard.black_board
 
-    def generate_rook_moves(self, bitboard: Bitboard, color_to_move):
-        rooks = bitboard.black_rooks if color_to_move else bitboard.white_rooks
+        for square in range(64):
+            if self.is_piece_on_square(knights, square):
+                board = np.uint64(0)
+                board = self.set_bit(board, square)
 
-    def generate_queen_moves(self, bitboard: Bitboard, color_to_move):
-        queens = bitboard.black_queens if color_to_move else bitboard.white_queens
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=17, file=self.not_h_file, left_shift=False, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=15, file=self.not_a_file, left_shift=False, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=10, file=self.not_hg_file, left_shift=False, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=6, file=self.not_ab_file, left_shift=False, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=17, file=self.not_a_file, left_shift=True, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=15, file=self.not_h_file, left_shift=True, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=10, file=self.not_ab_file, left_shift=True, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=6, file=self.not_hg_file, left_shift=True, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter="N"))
 
-    def generate_king_moves(self, bitboard: Bitboard, color_to_move):
+        return [move for move in moves if move is not None]
+
+    def generate_rook_moves(self, bitboard: Bitboard, color_to_move: bool, is_queen: bool) -> list:
+        moves = []
+        piece_letter = ""
+        # Queen can use the same exact algorithm
+        if is_queen:
+            rooks = bitboard.black_queens if color_to_move else bitboard.white_queens
+            piece_letter = "Q"
+        else:
+            rooks = bitboard.black_rooks if color_to_move else bitboard.white_rooks
+            piece_letter = "R"
+
+        opponent_pieces = bitboard.white_board if color_to_move else bitboard.black_board
+
+        for square in range(64):
+            if self.is_piece_on_square(rooks, square):
+                board = np.uint64(0)
+                board = self.set_bit(board, square)
+
+                shift_amount = 1
+
+                # Check right horizontal
+                while True:
+                    move = self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=shift_amount, file=self.not_a_file, left_shift=True, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter=piece_letter)
+                    if move:
+                        moves.append(move)
+                        if "x" in move:
+                            break
+                        shift_amount += 1
+
+                    else:
+                        break
+
+                shift_amount = 1
+                # Check left horizontal
+                while True:
+                    move = self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=shift_amount, file=self.not_h_file, left_shift=False, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter=piece_letter)
+                    if move:
+                        moves.append(move)
+                        if "x" in move:
+                            break
+                        shift_amount += 1
+                    else:
+                        break
+
+                shift_amount = 8
+                # Check up
+                while True:
+                    move = self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=shift_amount, file=self.not_h_file, left_shift=False, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter=piece_letter)
+                    if move:
+                        moves.append(move)
+                        if "x" in move:
+                            break
+                        shift_amount += 8
+                    else:
+                        break
+
+                shift_amount = 8
+                # Check down
+                while True:
+                    move = self.calculate_rook_knight_king_bitboard_moves(board=board, shift_amount=shift_amount, file=self.not_a_file, left_shift=True, opponent_pieces=opponent_pieces, full_board=bitboard.full_board, piece_letter=piece_letter)
+                    if move:
+                        moves.append(move)
+                        if "x" in move:
+                            break
+                        shift_amount += 8
+                    else:
+                        break
+
+        return [move for move in moves if move is not None]
+
+    def calculate_bishop_bitboard_moves(self, square: int, file: int, left_shift: bool, diagonal: int, opponent_pieces: np.uint64, full_board: np.uint64, piece_letter: str, subtract: bool) -> list:
+        moves = []
+
+        new_square = square
+        while True:
+            target_square = 0
+            board = np.uint64(0)
+            board = self.set_bit(board, new_square)
+
+            if left_shift:
+                if ((board << np.uint64(diagonal)) & file):
+                    target_square = self.get_least_sig_bit_index(board << np.uint64(diagonal))
+            else:
+                if ((board >> np.uint64(diagonal)) & file):
+                    target_square = self.get_least_sig_bit_index(board >> np.uint64(diagonal))
+
+            if target_square == 0:
+                break
+
+            if self.is_piece_on_square(opponent_pieces, target_square):
+                moves.append(piece_letter + "x" + SQUARES_TO_COORDS[target_square])
+                break
+            elif not self.is_piece_on_square(full_board, target_square):
+                if subtract:
+                    new_square = new_square - diagonal
+                else:
+                    new_square = new_square + diagonal
+                moves.append(piece_letter + SQUARES_TO_COORDS[new_square])
+            else:
+                break
+
+        return moves
+
+    def calculate_rook_knight_king_bitboard_moves(self, board: np.uint64, shift_amount: int, file: np.uint64, left_shift: bool, opponent_pieces: np.uint64, full_board: np.uint64, piece_letter: str) -> str:
+        target_square = 0
+
+        if left_shift:
+            if file == 0 or ((board << np.uint64(shift_amount)) & file):
+                target_square = self.get_least_sig_bit_index(board << np.uint64(shift_amount))
+        else:
+            if file == 0 or ((board >> np.uint64(shift_amount)) & file):
+                target_square = self.get_least_sig_bit_index(board >> np.uint64(shift_amount))
+
+        if target_square == 0:
+            return None
+
+        if self.is_piece_on_square(opponent_pieces, target_square):
+            return (piece_letter + "x" + SQUARES_TO_COORDS[target_square])
+        elif not self.is_piece_on_square(full_board, target_square):
+            return (piece_letter + SQUARES_TO_COORDS[target_square])
+        else:
+            return None
+
+    def generate_queen_moves(self, bitboard: Bitboard, color_to_move: bool) -> list:
+        moves = []
+
+        moves.extend(self.generate_rook_moves(bitboard=bitboard, color_to_move=color_to_move, is_queen=True))
+        moves.extend(self.generate_bishop_moves(bitboard=bitboard, color_to_move=color_to_move, is_queen=True))
+
+        return moves
+
+    def generate_king_moves(self, bitboard: Bitboard, color_to_move: bool) -> list:
+        moves = []
         king = bitboard.black_king if color_to_move else bitboard.white_king
+        opponent_pieces = bitboard.white_board if color_to_move else bitboard.black_board
+
+        # TODO: There is only one king, no need to check all 64 squares
+        for square in range(64):
+            if self.is_piece_on_square(king, square):
+                board = np.uint64(0)
+                board = self.set_bit(board, square)
+
+                # up
+                if square > H8:
+                    moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                        board=board,
+                        shift_amount=8,
+                        file=np.uint64(0),
+                        left_shift=False,
+                        opponent_pieces=opponent_pieces,
+                        full_board=bitboard.full_board,
+                        piece_letter="K"
+                    ))
+
+                # down
+                if square < A1:
+                    moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                        board=board,
+                        shift_amount=8,
+                        file=np.uint64(0),
+                        left_shift=True,
+                        opponent_pieces=opponent_pieces,
+                        full_board=bitboard.full_board,
+                        piece_letter="K"
+                    ))
+
+                # west
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                    board=board,
+                    shift_amount=1,
+                    file=self.not_h_file,
+                    left_shift=False,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter="K"
+                ))
+
+                # northwest
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                    board=board,
+                    shift_amount=9,
+                    file=self.not_h_file,
+                    left_shift=False,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter="K"
+                ))
+
+                # northeast
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                    board=board,
+                    shift_amount=7,
+                    file=self.not_a_file,
+                    left_shift=False,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter="K"
+                ))
+
+                # east
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                    board=board,
+                    shift_amount=1,
+                    file=self.not_a_file,
+                    left_shift=True,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter="K"
+                ))
+
+                # southeast
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                    board=board,
+                    shift_amount=9,
+                    file=self.not_a_file,
+                    left_shift=True,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter="K"
+                ))
+
+                # southwest
+                moves.append(self.calculate_rook_knight_king_bitboard_moves(
+                    board=board,
+                    shift_amount=7,
+                    file=self.not_h_file,
+                    left_shift=True,
+                    opponent_pieces=opponent_pieces,
+                    full_board=bitboard.full_board,
+                    piece_letter="K"
+                ))
+
+        return [move for move in moves if move is not None]
 
     def is_piece_on_square(self, bitboard: np.uint64, square: int) -> bool:
         return bool(np.ulonglong(bitboard) & (self.UNSIGNED_LONG_1 << np.ulonglong(square)))
@@ -235,7 +466,7 @@ class MoveGenerator():
     def set_bit(self, bitboard: np.uint64, square: int) -> np.uint64:
         return np.ulonglong(bitboard) | (self.UNSIGNED_LONG_1 << np.ulonglong(square))
 
-    def get_least_sig_bit_index(self, board):
+    def get_least_sig_bit_index(self, board: np.uint64) -> int:
         if board:
             return (int(board) & int(-board)).bit_length()-1
         else:
