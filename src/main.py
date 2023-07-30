@@ -16,6 +16,10 @@ def get_args() -> None:
                         dest='fen',
                         type=str,
                         help='FEN used to populate the board. Try "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" for the start position.')
+    parser.add_argument('-color', '-c', '--color', '--c',
+                        dest='color',
+                        type=str,
+                        help='This flag is used to determine which color the user would like to play against Serpent. Ex: -color=white')
     return parser.parse_args()
 
 
